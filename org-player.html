@@ -1067,72 +1067,76 @@ setInterval(() => {
   document.getElementById('bagianTime').textContent = `${fmt(elapsedSec)} / ${fmt(SONG_DURATION)}`;
 }, 1000);
 
-// ===== SONGS DATA =====
-const songs = [
-  { title:'Suci Dalam Debu',      artist:'Iklim',            key:'A',  album:'Pop Melayu', dur:'3:45' },
-  { title:'Separuh Aku',          artist:'Noah',             key:'C',  album:'Pop Indo',   dur:'4:12' },
-  { title:'Seberapa Pantas',      artist:'Sheila On 7',      key:'G',  album:'Pop Indo',   dur:'4:30' },
-  { title:'Bintang Di Surga',     artist:'Peterpan',         key:'D',  album:'Pop Indo',   dur:'4:05' },
-  { title:'Kau Adalah',           artist:'Isyana Sarasvati', key:'Bb', album:'Pop Indo',   dur:'3:58' },
-  { title:'Melukis Senja',        artist:'Budi Doremi',      key:'F',  album:'Pop Indo',   dur:'4:20' },
-  { title:'Tak Ingin Usai',       artist:'Virgoun',          key:'E',  album:'Pop Indo',   dur:'4:10' },
-  { title:'Cinta Luar Biasa',     artist:'Andmesh',          key:'Ab', album:'Pop Indo',   dur:'4:45' },
-  { title:'Hati-Hati di Jalan',   artist:'Tulus',            key:'C',  album:'Pop Indo',   dur:'3:52' },
-  { title:'Manusia Kuat',         artist:'Tulus',            key:'G',  album:'Pop Indo',   dur:'4:08' },
-  { title:'Satu Rasa Cinta',      artist:'Judika',           key:'Db', album:'Pop Indo',   dur:'4:33' },
-  { title:'Di Mana Kamu',         artist:'Yovie & Nuno',    key:'A',  album:'Pop Indo',   dur:'4:15' },
-  { title:'Ada Yang Hilang',      artist:'Padi',             key:'F#', album:'Pop Indo',   dur:'4:22' },
-  { title:'Langit Tak Mendengar', artist:'Peterpan',         key:'D',  album:'Pop Indo',   dur:'4:40' },
-  { title:'Kisah Tak Sempurna',   artist:'Seventeen',        key:'Eb', album:'Pop Indo',   dur:'4:18' },
-  { title:'Cinta Sejati',         artist:'BCL',              key:'B',  album:'Soundtrack', dur:'4:55' },
-  { title:'Tentang Kamu',         artist:'Yura Yunita',      key:'F',  album:'Pop Indo',   dur:'4:01' },
-  { title:'Ruang Rindu',          artist:'Letto',            key:'C',  album:'Pop Indo',   dur:'4:28' },
-  { title:'Aku Milikmu',          artist:'Dewa 19',          key:'G',  album:'Lawas',      dur:'5:02' },
-  { title:'Bukan Cinta Biasa',    artist:'Afgan',            key:'Bb', album:'Pop Indo',   dur:'4:14' },
-  { title:'Separuh Nafas',        artist:'Dewa 19',          key:'D',  album:'Lawas',      dur:'5:18' },
-  { title:'Roman Picisan',        artist:'Dewa 19',          key:'G',  album:'Lawas',      dur:'4:47' },
-  { title:'Dealova',              artist:'Once',             key:'C',  album:'Lawas',      dur:'4:35' },
-  { title:'Tinggallah Ku Sendiri',artist:'Kerispatih',       key:'F',  album:'Lawas',      dur:'4:22' },
-  { title:'Menghitung Hari',      artist:'Krisdayanti',      key:'Ab', album:'Lawas',      dur:'4:55' },
-  { title:'Mimpi',                artist:'Anggun',           key:'E',  album:'Lawas',      dur:'4:10' },
-  { title:'Kangen',               artist:'Dewa 19',          key:'A',  album:'Lawas',      dur:'4:30' },
-  { title:'Peri Cintaku',         artist:'Erwin Gutawa',     key:'C',  album:'Lawas',      dur:'4:48' },
-  { title:'Cinta',                artist:'Tanpa Nama',       key:'G',  album:'Pop Melayu', dur:'4:05' },
-  { title:'Jauh Di Mata',         artist:'Iklim',            key:'A',  album:'Pop Melayu', dur:'4:12' },
+// ===== SONGS DATA — localStorage =====
+const DEFAULT_SONGS = [
+  { id:1, title:'Suci Dalam Debu', artist:'Iklim', key:'A', album:'Pop Melayu', dur:'3:45', tempo:105, birama:'4/4', chords:['G','F','D#','D'], lirik:'Andai waktu dapat kuputar kembali\nIngin kuucapkan kata maafku untukmu\nTerlambat sudah kini ku sadari\nCinta suci yang ku pinta\n\nAndai masa dapat ku ulang semula\nKu pastikan tiada air matamu\nMaafkan ku yang mengkhianatimu\nKasih yang suci yang kau beri' },
+  { id:2, title:'Separuh Aku', artist:'Noah', key:'C', album:'Pop Indo', dur:'4:12', tempo:90, birama:'4/4', chords:['C','G','Am','F'], lirik:'' },
+  { id:3, title:'Seberapa Pantas', artist:'Sheila On 7', key:'G', album:'Pop Indo', dur:'4:30', tempo:80, birama:'4/4', chords:['G','D','Em','C'], lirik:'' },
+  { id:4, title:'Bintang Di Surga', artist:'Peterpan', key:'D', album:'Pop Indo', dur:'4:05', tempo:95, birama:'4/4', chords:['D','A','Bm','G'], lirik:'' },
+  { id:5, title:'Kau Adalah', artist:'Isyana Sarasvati', key:'Bb', album:'Pop Indo', dur:'3:58', tempo:88, birama:'4/4', chords:['Bb','F','Gm','Eb'], lirik:'' },
 ];
 
-// Render sidebar list
-const listEl = document.getElementById('listLagu');
-songs.forEach((s, i) => {
-  const row = document.createElement('div');
-  row.className = 'song-row' + (i === 0 ? ' active' : '');
-  row.innerHTML = `
-    <div class="song-num">${i+1}</div>
-    <div class="song-detail">
-      <div class="song-title">${s.title}</div>
-      <div class="song-artist">${s.artist}</div>
-    </div>
-    <div class="song-key">${s.key}</div>`;
-  row.onclick = () => {
-    document.querySelectorAll('.song-row').forEach(r => r.classList.remove('active'));
-    row.classList.add('active');
-  };
-  listEl.appendChild(row);
-});
+function loadSongs() {
+  try {
+    const raw = localStorage.getItem('orgSongs');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  localStorage.setItem('orgSongs', JSON.stringify(DEFAULT_SONGS));
+  return DEFAULT_SONGS;
+}
+function saveSongs(arr) { localStorage.setItem('orgSongs', JSON.stringify(arr)); }
+function nextId(arr) { return arr.length ? Math.max(...arr.map(s => s.id)) + 1 : 1; }
 
-// ===== MODAL: LIST LAGU / GALERI =====
-const albums = [
-  { name:'Semua',       icon:'🎵', count: songs.length },
-  { name:'Pop Indo',    icon:'🎤', count: songs.filter(s=>s.album==='Pop Indo').length },
-  { name:'Pop Melayu',  icon:'🌙', count: songs.filter(s=>s.album==='Pop Melayu').length },
-  { name:'Lawas',       icon:'🕰️', count: songs.filter(s=>s.album==='Lawas').length },
-  { name:'Soundtrack',  icon:'🎬', count: songs.filter(s=>s.album==='Soundtrack').length },
-];
-let activeAlbum = 'Semua', searchQuery = '';
+let songs = loadSongs();
+let activeSongId = songs[0]?.id || null;
+let searchQuery = '';
+let activeAlbum = 'Semua';
 
+// ===== LOAD SONG KE PLAYER =====
+function loadSongToPlayer(song) {
+  activeSongId = song.id;
+  document.querySelector('.song-info h2').textContent = song.title;
+  // pitch
+  const keyClean = song.key.replace('b','').replace('#','');
+  const ni = NOTES.indexOf(keyClean);
+  pitchIdx = ni >= 0 ? ni : NOTES.indexOf(song.key);
+  if (pitchIdx < 0) pitchIdx = 0;
+  updatePitch();
+  // tempo
+  bpm = song.tempo || 105;
+  document.getElementById('tempoDisplay').textContent = bpm;
+  // lirik
+  const lines = (song.lirik || '').split('\n');
+  document.querySelector('.lyric-active-prev').textContent = lines[0] || '';
+  document.querySelector('.lyric-active').textContent     = lines[1] || '';
+  document.querySelector('.lyric-next1').textContent      = lines[2] || '';
+  document.querySelector('.lyric-next2').textContent      = lines[3] || '';
+  renderSidebar();
+}
+
+// ===== SIDEBAR =====
+function renderSidebar() {
+  const listEl = document.getElementById('listLagu');
+  listEl.innerHTML = '';
+  songs.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'song-row' + (s.id === activeSongId ? ' active' : '');
+    row.innerHTML = `
+      <div class="song-num">${i+1}</div>
+      <div class="song-detail">
+        <div class="song-title">${s.title}</div>
+        <div class="song-artist">${s.artist}</div>
+      </div>
+      <div class="song-key">${s.key}</div>`;
+    row.onclick = () => { loadSongToPlayer(s); };
+    listEl.appendChild(row);
+  });
+}
+renderSidebar();
+
+// ===== MODAL LIST LAGU =====
 function renderModalList() {
   const body = document.getElementById('modalBody');
-  // album grid
   let filtered = songs;
   if (activeAlbum !== 'Semua') filtered = songs.filter(s => s.album === activeAlbum);
   if (searchQuery) filtered = filtered.filter(s =>
@@ -1140,274 +1144,215 @@ function renderModalList() {
 
   let html = `<div class="section-title">${filtered.length} LAGU</div><div class="modal-song-list">`;
   filtered.forEach((s, i) => {
-    html += `
-      <div class="modal-song-row${i===0 && activeAlbum==='Semua' && !searchQuery ? ' active':''}" onclick="selectSong(this,'${s.title}')">
-        <div class="msong-num">${i+1}</div>
-        <div class="msong-info">
-          <div class="msong-title">${s.title}</div>
-          <div class="msong-artist">${s.artist}</div>
-        </div>
-        <div class="msong-key">${s.key}</div>
-        <div class="msong-dur">${s.dur}</div>
-      </div>`;
+    html += `<div class="modal-song-row${s.id===activeSongId?' active':''}" data-id="${s.id}" style="cursor:pointer">
+      <div class="msong-num">${i+1}</div>
+      <div class="msong-info">
+        <div class="msong-title">${s.title}</div>
+        <div class="msong-artist">${s.artist}</div>
+      </div>
+      <div class="msong-key">${s.key}</div>
+      <div class="msong-dur">${s.dur}</div>
+      <div class="msong-del" data-id="${s.id}" style="color:#555;padding:0 6px;font-size:14px">🗑</div>
+    </div>`;
   });
   html += '</div>';
   body.innerHTML = html;
+
+  body.querySelectorAll('.modal-song-row').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.classList.contains('msong-del')) return;
+      const song = songs.find(s => s.id === parseInt(row.dataset.id));
+      if (song) { loadSongToPlayer(song); closeListModal(); }
+    };
+  });
+  body.querySelectorAll('.msong-del').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      if (!confirm('Hapus lagu ini?')) return;
+      songs = songs.filter(s => s.id !== id);
+      saveSongs(songs);
+      if (activeSongId === id && songs.length) loadSongToPlayer(songs[0]);
+      renderModalList();
+      renderAlbumCards();
+    };
+  });
 }
 
-function renderAlbumTabs() {
-  const tabs = document.getElementById('albumTabs');
-  tabs.innerHTML = '';
-  // album cards row at top
-  let cardsHtml = '<div style="padding:12px 18px;border-bottom:1px solid #222;display:flex;gap:8px;overflow-x:auto;flex-shrink:0">';
-  albums.forEach(a => {
-    cardsHtml += `<div class="album-card${a.name===activeAlbum?' active-album':''}" onclick="setAlbum('${a.name}')">
-      <div class="album-icon">${a.icon}</div>
-      <div class="album-name">${a.name}</div>
-      <div class="album-count">${a.count} lagu</div>
-    </div>`;
-  });
-  cardsHtml += '</div>';
-  document.getElementById('modalBody').insertAdjacentHTML('beforebegin', cardsHtml);
-}
-
-window.setAlbum = function(name) {
-  activeAlbum = name;
-  document.querySelectorAll('.album-card').forEach(c => {
-    c.classList.toggle('active-album', c.querySelector('.album-name').textContent === name);
-  });
-  renderModalList();
-};
-
-window.selectSong = function(el, title) {
-  document.querySelectorAll('.modal-song-row').forEach(r => r.classList.remove('active'));
-  el.classList.add('active');
-  // update header song title
-  document.querySelector('.song-info h2').textContent = title;
-};
-
-document.getElementById('btnListLagu').onclick = () => {
-  searchQuery = '';
-  document.getElementById('modalSearch').value = '';
-  activeAlbum = 'Semua';
-  const body = document.getElementById('modalBody');
-  body.innerHTML = '';
-  // remove old album cards if any
-  const old = document.querySelector('.overlay .album-cards-row');
+function renderAlbumCards() {
+  const old = document.getElementById('albumCardsRow');
   if (old) old.remove();
-  renderModalList();
-  // insert album cards before body
-  const overlay = document.getElementById('overlayList');
-  // insert cards
-  const modalBody = document.getElementById('modalBody');
-  const cardsDiv = document.createElement('div');
-  cardsDiv.style.cssText = 'padding:12px 18px;border-bottom:1px solid #222;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;background:#141414';
-  albums.forEach(a => {
+  const albumMap = {};
+  songs.forEach(s => { albumMap[s.album] = (albumMap[s.album]||0)+1; });
+  const allAlbums = [{ name:'Semua', icon:'🎵', count: songs.length },
+    ...Object.entries(albumMap).map(([name, count]) => ({ name, icon:'🎤', count }))];
+  const div = document.createElement('div');
+  div.id = 'albumCardsRow';
+  div.style.cssText = 'padding:10px 14px;border-bottom:1px solid #222;display:flex;gap:8px;overflow-x:auto;flex-shrink:0;background:#141414';
+  allAlbums.forEach(a => {
     const card = document.createElement('div');
     card.className = 'album-card' + (a.name===activeAlbum?' active-album':'');
     card.innerHTML = `<div class="album-icon">${a.icon}</div><div class="album-name">${a.name}</div><div class="album-count">${a.count} lagu</div>`;
-    card.onclick = () => setAlbum(a.name);
-    cardsDiv.appendChild(card);
+    card.onclick = () => { activeAlbum = a.name; renderAlbumCards(); renderModalList(); };
+    div.appendChild(card);
   });
-  modalBody.parentNode.insertBefore(cardsDiv, modalBody);
-  overlay.classList.add('open');
-};
-
-document.getElementById('closeList').onclick = () => {
-  document.getElementById('overlayList').classList.remove('open');
-  // cleanup inserted cards
-  const inserted = document.querySelector('#overlayList .modal-list > div[style]');
-  if (inserted) inserted.remove();
-};
-
-document.getElementById('modalSearch').oninput = e => {
-  searchQuery = e.target.value.toLowerCase().trim();
-  renderModalList();
-};
-
-// close on backdrop click
-document.getElementById('overlayList').onclick = e => {
-  if (e.target === document.getElementById('overlayList')) {
-    document.getElementById('overlayList').classList.remove('open');
-    const inserted = document.querySelector('#overlayList .modal-list > div[style]');
-    if (inserted) inserted.remove();
-  }
-};
-
-// ===== MODAL: EDITOR =====
-const editorContent = {
-  info: `
-    <div class="ed-row">
-      <div class="ed-group">
-        <div class="ed-label">JUDUL LAGU</div>
-        <input class="ed-input" value="Suci Dalam Debu">
-      </div>
-      <div class="ed-group">
-        <div class="ed-label">ARTIS / PENYANYI</div>
-        <input class="ed-input" value="Iklim">
-      </div>
-    </div>
-    <div class="ed-row">
-      <div class="ed-group">
-        <div class="ed-label">ALBUM</div>
-        <input class="ed-input" value="Pop Melayu">
-      </div>
-      <div class="ed-group">
-        <div class="ed-label">TAHUN</div>
-        <input class="ed-input" value="1990" style="max-width:120px">
-      </div>
-      <div class="ed-group">
-        <div class="ed-label">DURASI</div>
-        <input class="ed-input" value="3:45" style="max-width:100px">
-      </div>
-    </div>
-    <div class="ed-row">
-      <div class="ed-group">
-        <div class="ed-label">NADA ASLI</div>
-        <select class="ed-select">
-          ${NOTES.map(n=>`<option${n==='A'?' selected':''}>${n}</option>`).join('')}
-        </select>
-      </div>
-      <div class="ed-group">
-        <div class="ed-label">TEMPO (BPM)</div>
-        <input class="ed-input" type="number" value="105" min="40" max="240">
-      </div>
-      <div class="ed-group">
-        <div class="ed-label">BIRAMA</div>
-        <select class="ed-select">
-          <option selected>4/4</option><option>3/4</option><option>6/8</option><option>2/4</option>
-        </select>
-      </div>
-    </div>`,
-  chord: `
-    <div class="ed-group">
-      <div class="ed-label">CHORD AKTIF LAGU</div>
-      <div class="chord-editor">
-        <div class="chord-pill active-pill">G <span class="rm">✕</span></div>
-        <div class="chord-pill">F <span class="rm">✕</span></div>
-        <div class="chord-pill">D# <span class="rm">✕</span></div>
-        <div class="chord-pill">D <span class="rm">✕</span></div>
-        <button class="add-chord-btn">+ Tambah Chord</button>
-      </div>
-    </div>
-    <div class="ed-row" style="margin-top:8px">
-      <div class="ed-group">
-        <div class="ed-label">NEXT CHORD SEQUENCE</div>
-        <input class="ed-input" value="G → F → D# → D → G">
-      </div>
-    </div>
-    <div class="ed-row">
-      <div class="ed-group">
-        <div class="ed-label">STYLE / IRAMA</div>
-        <select class="ed-select">
-          <option>Ballad Slow</option><option>Dangdut</option><option>Rock</option>
-          <option>Pop</option><option>Jazz</option><option>Keroncong</option>
-        </select>
-      </div>
-      <div class="ed-group">
-        <div class="ed-label">BEAT PATTERN</div>
-        <select class="ed-select">
-          <option>Standard</option><option>8 Beat</option><option>16 Beat</option><option>Waltz</option>
-        </select>
-      </div>
-    </div>`,
-  lirik: `
-    <div class="ed-group">
-      <div class="ed-label">LIRIK LAGU (satu baris = satu baris lirik)</div>
-      <textarea class="ed-textarea" rows="12">Andai waktu dapat kuputar kembali
-Ingin kuucapkan kata maafku untukmu
-Terlambat sudah kini ku sadari
-Cinta suci yang ku pinta
-
-Andai masa dapat ku ulang semula
-Ku pastikan tiada air matamu
-Maafkan ku yang mengkhianatimu
-Kasih yang suci yang kau beri</textarea>
-    </div>
-    <div class="ed-row">
-      <div class="ed-group">
-        <div class="ed-label">FONT SIZE LIRIK</div>
-        <select class="ed-select">
-          <option>Kecil</option><option selected>Sedang</option><option>Besar</option><option>Sangat Besar</option>
-        </select>
-      </div>
-      <div class="ed-group">
-        <div class="ed-label">WARNA LIRIK AKTIF</div>
-        <input type="color" value="#ffffff" style="height:38px;border-radius:8px;border:1px solid #333;background:#1a1a1a;cursor:pointer;width:80px">
-      </div>
-    </div>`,
-  struktur: `
-    <div class="ed-label" style="margin-bottom:8px">STRUKTUR / BAGIAN LAGU</div>
-    <div class="bagian-list">
-      <div class="bagian-item">
-        <span class="bagian-drag">⠿</span>
-        <span class="bagian-name-tag">INTRO</span>
-        <span class="bagian-chord-str">G → F → D# → D</span>
-        <span class="bagian-bars">8 bar</span>
-      </div>
-      <div class="bagian-item">
-        <span class="bagian-drag">⠿</span>
-        <span class="bagian-name-tag">VERSE 1</span>
-        <span class="bagian-chord-str">G → F → D# → D → G → F → D# → D</span>
-        <span class="bagian-bars">16 bar</span>
-      </div>
-      <div class="bagian-item">
-        <span class="bagian-drag">⠿</span>
-        <span class="bagian-name-tag">CHORUS</span>
-        <span class="bagian-chord-str">D# → D → G → F</span>
-        <span class="bagian-bars">8 bar</span>
-      </div>
-      <div class="bagian-item">
-        <span class="bagian-drag">⠿</span>
-        <span class="bagian-name-tag">VERSE 2</span>
-        <span class="bagian-chord-str">G → F → D# → D → G → F → D# → D</span>
-        <span class="bagian-bars">16 bar</span>
-      </div>
-      <div class="bagian-item">
-        <span class="bagian-drag">⠿</span>
-        <span class="bagian-name-tag">CHORUS</span>
-        <span class="bagian-chord-str">D# → D → G → F</span>
-        <span class="bagian-bars">8 bar</span>
-      </div>
-      <div class="bagian-item">
-        <span class="bagian-drag">⠿</span>
-        <span class="bagian-name-tag">OUTRO</span>
-        <span class="bagian-chord-str">G → F → D# → D</span>
-        <span class="bagian-bars">4 bar</span>
-      </div>
-    </div>
-    <button class="add-chord-btn" style="margin-top:10px;border-radius:8px;padding:8px 16px">+ Tambah Bagian</button>`
-};
-
-let activeEditorTab = 'info';
-function renderEditorBody() {
-  document.getElementById('editorBody').innerHTML = editorContent[activeEditorTab];
+  document.getElementById('modalBody').parentNode.insertBefore(div, document.getElementById('modalBody'));
 }
 
-document.getElementById('btnEditor').onclick = () => {
+function openListModal() {
+  searchQuery = ''; activeAlbum = 'Semua';
+  document.getElementById('modalSearch').value = '';
+  document.getElementById('modalBody').innerHTML = '';
+  const old = document.getElementById('albumCardsRow'); if (old) old.remove();
+  renderAlbumCards();
+  renderModalList();
+  document.getElementById('overlayList').classList.add('open');
+}
+function closeListModal() {
+  document.getElementById('overlayList').classList.remove('open');
+  const old = document.getElementById('albumCardsRow'); if (old) old.remove();
+}
+
+document.getElementById('btnListLagu').onclick = openListModal;
+document.getElementById('closeList').onclick = closeListModal;
+document.getElementById('modalSearch').oninput = e => { searchQuery = e.target.value.toLowerCase().trim(); renderModalList(); };
+document.getElementById('overlayList').onclick = e => { if (e.target===document.getElementById('overlayList')) closeListModal(); };
+
+// ===== EDITOR =====
+let activeEditorTab = 'info';
+let editingSongId = null;
+
+function buildEditorInfo(song) {
+  return `
+    <div class="ed-row">
+      <div class="ed-group"><div class="ed-label">JUDUL LAGU</div>
+        <input class="ed-input" id="ed-title" value="${song?.title||''}"></div>
+      <div class="ed-group"><div class="ed-label">ARTIS / PENYANYI</div>
+        <input class="ed-input" id="ed-artist" value="${song?.artist||''}"></div>
+    </div>
+    <div class="ed-row">
+      <div class="ed-group"><div class="ed-label">ALBUM</div>
+        <input class="ed-input" id="ed-album" value="${song?.album||''}"></div>
+      <div class="ed-group"><div class="ed-label">DURASI</div>
+        <input class="ed-input" id="ed-dur" value="${song?.dur||''}" style="max-width:100px"></div>
+    </div>
+    <div class="ed-row">
+      <div class="ed-group"><div class="ed-label">NADA ASLI</div>
+        <select class="ed-select" id="ed-key">
+          ${NOTES.map(n=>`<option${n===(song?.key||'C')?' selected':''}>${n}</option>`).join('')}
+        </select></div>
+      <div class="ed-group"><div class="ed-label">TEMPO (BPM)</div>
+        <input class="ed-input" id="ed-tempo" type="number" value="${song?.tempo||105}" min="40" max="240"></div>
+      <div class="ed-group"><div class="ed-label">BIRAMA</div>
+        <select class="ed-select" id="ed-birama">
+          ${['4/4','3/4','6/8','2/4'].map(b=>`<option${b===(song?.birama||'4/4')?' selected':''}>${b}</option>`).join('')}
+        </select></div>
+    </div>`;
+}
+
+function buildEditorChord(song) {
+  const chords = song?.chords || [];
+  const pills = chords.map((c,i)=>`<div class="chord-pill${i===0?' active-pill':''}" data-chord="${c}">${c} <span class="rm" onclick="removeChord(this)">✕</span></div>`).join('');
+  return `<div class="ed-group"><div class="ed-label">CHORD AKTIF LAGU</div>
+    <div class="chord-editor" id="chordEditor">
+      ${pills}
+      <button class="add-chord-btn" onclick="addChordPrompt()">+ Tambah Chord</button>
+    </div></div>`;
+}
+
+function buildEditorLirik(song) {
+  return `<div class="ed-group"><div class="ed-label">LIRIK LAGU (satu baris = satu baris lirik)</div>
+    <textarea class="ed-textarea" id="ed-lirik" rows="12">${(song?.lirik||'').replace(/</g,'&lt;')}</textarea></div>`;
+}
+
+window.removeChord = function(el) { el.parentElement.remove(); };
+window.addChordPrompt = function() {
+  const c = prompt('Masukkan chord (contoh: G, Am, F#):');
+  if (!c) return;
+  const editor = document.getElementById('chordEditor');
+  const btn = editor.querySelector('.add-chord-btn');
+  const pill = document.createElement('div');
+  pill.className = 'chord-pill'; pill.dataset.chord = c.trim();
+  pill.innerHTML = `${c.trim()} <span class="rm" onclick="removeChord(this)">✕</span>`;
+  editor.insertBefore(pill, btn);
+};
+
+function getCurrentEditorSong() { return songs.find(s => s.id === editingSongId) || null; }
+
+function renderEditorBody() {
+  const song = getCurrentEditorSong();
+  const bodies = { info: buildEditorInfo(song), chord: buildEditorChord(song), lirik: buildEditorLirik(song) };
+  document.getElementById('editorBody').innerHTML = bodies[activeEditorTab] || '';
+}
+
+function openEditor(songId) {
+  editingSongId = songId;
   activeEditorTab = 'info';
-  document.querySelectorAll('.editor-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'info'));
+  document.querySelector('#overlayEditor .modal-header h3').textContent = songId ? '✏️ Edit Lagu' : '➕ Lagu Baru';
+  document.querySelectorAll('.editor-tab').forEach(t => t.classList.toggle('active', t.dataset.tab==='info'));
   renderEditorBody();
   document.getElementById('overlayEditor').classList.add('open');
-};
+}
+
+document.getElementById('btnEditor').onclick = () => openEditor(activeSongId);
 
 document.querySelectorAll('.editor-tab').forEach(tab => {
   tab.onclick = () => {
     activeEditorTab = tab.dataset.tab;
-    document.querySelectorAll('.editor-tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.editor-tab').forEach(t => t.classList.toggle('active', t===tab));
     renderEditorBody();
   };
 });
 
-document.getElementById('closeEditor').onclick   = () => document.getElementById('overlayEditor').classList.remove('open');
-document.getElementById('cancelEditor').onclick  = () => document.getElementById('overlayEditor').classList.remove('open');
-document.getElementById('saveEditor').onclick    = () => {
+function collectEditorData() {
+  return {
+    title:  document.getElementById('ed-title')?.value.trim() || '',
+    artist: document.getElementById('ed-artist')?.value.trim() || '',
+    album:  document.getElementById('ed-album')?.value.trim() || '',
+    dur:    document.getElementById('ed-dur')?.value.trim() || '',
+    key:    document.getElementById('ed-key')?.value || 'C',
+    tempo:  parseInt(document.getElementById('ed-tempo')?.value) || 105,
+    birama: document.getElementById('ed-birama')?.value || '4/4',
+    lirik:  document.getElementById('ed-lirik')?.value || '',
+    chords: [...(document.querySelectorAll('#chordEditor .chord-pill')||[])].map(p=>p.dataset.chord).filter(Boolean),
+  };
+}
+
+document.getElementById('saveEditor').onclick = () => {
+  const data = collectEditorData();
+  const existing = songs.find(s => s.id === editingSongId);
+  if (existing) {
+    Object.assign(existing, data);
+    saveSongs(songs);
+    if (activeSongId === editingSongId) loadSongToPlayer(existing);
+  } else {
+    if (!data.title) { alert('Judul lagu wajib diisi!'); return; }
+    const newSong = { id: nextId(songs), ...data };
+    songs.push(newSong);
+    saveSongs(songs);
+    loadSongToPlayer(newSong);
+  }
+  renderSidebar();
   document.getElementById('overlayEditor').classList.remove('open');
 };
+
+document.getElementById('closeEditor').onclick  = () => document.getElementById('overlayEditor').classList.remove('open');
+document.getElementById('cancelEditor').onclick = () => document.getElementById('overlayEditor').classList.remove('open');
 document.getElementById('overlayEditor').onclick = e => {
-  if (e.target === document.getElementById('overlayEditor'))
-    document.getElementById('overlayEditor').classList.remove('open');
+  if (e.target===document.getElementById('overlayEditor')) document.getElementById('overlayEditor').classList.remove('open');
 };
+
+// Tombol Lagu Baru di footer editor
+const edFooter = document.querySelector('.ed-footer');
+const btnNew = document.createElement('button');
+btnNew.className = 'btn-cancel';
+btnNew.style.marginRight = 'auto';
+btnNew.textContent = '➕ Lagu Baru';
+btnNew.onclick = () => openEditor(null);
+edFooter.prepend(btnNew);
+
+// Load lagu pertama saat start
+if (songs.length) loadSongToPlayer(songs[0]);
 </script>
 </body>
 </html>
