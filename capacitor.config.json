@@ -1,0 +1,14 @@
+{
+  "appId": "com.endlan.organtunggal",
+  "appName": "Organ Tunggal",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": null,
+      "keystoreAlias": null
+    }
+  }
+}
