@@ -693,9 +693,8 @@
               <div class="pitch-value" id="pitchDisplay">G</div>
               <button class="ctrl-btn" id="pitchUp">+</button>
             </div>
-            <div class="pitch-sub">Nada : <span id="pitchSub">G</span></div>
           </div>
-          <div class="tempo-box" style="flex:2;">
+          <div class="tempo-box" style="flex:1;">
             <div class="ctrl-label">TEMPO</div>
             <div class="tempo-ctrl">
               <button class="ctrl-btn" id="tempoDown">−</button>
@@ -704,7 +703,6 @@
                 <div class="tempo-bpm">BPM</div>
               </div>
               <button class="ctrl-btn" id="tempoUp">+</button>
-              <input type="range" class="tempo-slider" id="tempoSlider" min="40" max="240" value="105" style="flex:1; margin:0;">
             </div>
           </div>
         </div>
@@ -983,14 +981,12 @@ updateChords(); // render awal
 function updateTempo(val) {
   bpm = Math.max(40, Math.min(240, val));
   document.getElementById('tempoDisplay').textContent = bpm;
-  document.getElementById('tempoSlider').value = bpm;
   document.querySelectorAll('.song-meta span').forEach(s => {
     if (s.textContent.includes('BPM')) s.textContent = bpm + ' BPM';
   });
 }
-document.getElementById('tempoUp').onclick     = () => updateTempo(bpm + 1);
-document.getElementById('tempoDown').onclick   = () => updateTempo(bpm - 1);
-document.getElementById('tempoSlider').oninput = e => updateTempo(parseInt(e.target.value));
+document.getElementById('tempoUp').onclick   = () => updateTempo(bpm + 1);
+document.getElementById('tempoDown').onclick = () => updateTempo(bpm - 1);
 
 // ===== PROGRESS BAR =====
 function fmt(s) {
