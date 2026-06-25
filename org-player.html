@@ -298,6 +298,19 @@
   .tempo-bpm { font-size: 10px; color: #888; font-weight: 600; letter-spacing: 1px; }
   .tempo-slider { margin-top: 8px; width: 100%; accent-color: #1e90ff; }
 
+  .metronome-row {
+    display: flex; gap: 6px; justify-content: center;
+    margin-top: 8px;
+  }
+  .metro-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #222; border: 1.5px solid #333;
+    transition: background 0.05s, box-shadow 0.05s;
+    flex-shrink: 0;
+  }
+  .metro-dot.beat-1 { background: #ff4444; border-color: #ff4444; box-shadow: 0 0 8px #ff444499; }
+  .metro-dot.beat-n { background: #1e90ff; border-color: #1e90ff; box-shadow: 0 0 6px #1e90ff88; }
+
   .play-buttons { display: flex; gap: 6px; }
   .play-btn {
     flex: 1; border-radius: 10px; border: none;
@@ -672,6 +685,12 @@
               <button class="ctrl-btn" id="tempoUp">+</button>
             </div>
             <input type="range" class="tempo-slider" id="tempoSlider" min="40" max="240" value="105">
+            <div class="metronome-row" id="metronomeRow">
+              <div class="metro-dot" id="mDot0"></div>
+              <div class="metro-dot" id="mDot1"></div>
+              <div class="metro-dot" id="mDot2"></div>
+              <div class="metro-dot" id="mDot3"></div>
+            </div>
           </div>
         </div>
         <div class="mixer-row">
@@ -975,6 +994,47 @@ function updateTempo(val) {
 document.getElementById('tempoUp').onclick     = () => updateTempo(bpm + 1);
 document.getElementById('tempoDown').onclick   = () => updateTempo(bpm - 1);
 document.getElementById('tempoSlider').oninput = e => updateTempo(parseInt(e.target.value));
+
+// ===== METRONOME =====
+let metroBeat = 0;
+let metroTimer = null;
+const BEATS = 4;
+
+function metroTick() {
+  const dots = document.querySelectorAll('.metro-dot');
+  dots.forEach((d, i) => {
+    d.classList.remove('beat-1', 'beat-n');
+    if (i === metroBeat) {
+      d.classList.add(metroBeat === 0 ? 'beat-1' : 'beat-n');
+    }
+  });
+  // flash off after 80ms
+  setTimeout(() => {
+    dots.forEach(d => d.classList.remove('beat-1', 'beat-n'));
+  }, 80);
+  metroBeat = (metroBeat + 1) % BEATS;
+}
+
+function startMetronome() {
+  if (metroTimer) clearInterval(metroTimer);
+  const intervalMs = (60 / bpm) * 1000;
+  metroBeat = 0;
+  metroTick();
+  metroTimer = setInterval(metroTick, intervalMs);
+}
+
+// restart metronome when tempo changes
+const _origUpdateTempo = updateTempo;
+function updateTempo(val) {
+  _origUpdateTempo(val);
+  startMetronome();
+}
+// rebind events with new updateTempo
+document.getElementById('tempoUp').onclick     = () => updateTempo(bpm + 1);
+document.getElementById('tempoDown').onclick   = () => updateTempo(bpm - 1);
+document.getElementById('tempoSlider').oninput = e => updateTempo(parseInt(e.target.value));
+
+startMetronome();
 
 // ===== PROGRESS BAR =====
 function fmt(s) {
