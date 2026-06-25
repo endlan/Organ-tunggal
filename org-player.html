@@ -300,6 +300,9 @@
     background: #111; border: 1px solid #222; border-radius: 8px;
     padding: 6px 10px;
   }
+  .pitch-tempo-row {
+    display: flex; gap: 6px; flex-shrink: 0; margin-top: 6px;
+  }
   .tempo-ctrl { display: flex; align-items: center; gap: 6px; }
   .tempo-value {
     background: #0a0a0a; border: 1px solid #333; border-radius: 6px;
@@ -660,31 +663,8 @@
     <!-- TOP ROW: col-controls kiri + lirik kanan -->
     <div class="top-row">
 
-      <!-- KOLOM KIRI: pitch, tempo, mixer -->
+      <!-- KOLOM KIRI: mixer atas, pitch+tempo bawah -->
       <div class="col-controls">
-        <div style="display:flex; gap:6px;">
-          <div class="pitch-box" style="flex:1;">
-            <div class="ctrl-label">PITCH / NADA SEKARANG</div>
-            <div class="pitch-ctrl">
-              <button class="ctrl-btn" id="pitchDown">−</button>
-              <div class="pitch-value" id="pitchDisplay">G</div>
-              <button class="ctrl-btn" id="pitchUp">+</button>
-            </div>
-            <div class="pitch-sub">Nada Sekarang : <span id="pitchSub">G</span></div>
-          </div>
-          <div class="tempo-box" style="flex:1;">
-            <div class="ctrl-label">TEMPO</div>
-            <div class="tempo-ctrl">
-              <button class="ctrl-btn" id="tempoDown">−</button>
-              <div class="tempo-value">
-                <div class="tempo-num" id="tempoDisplay">105</div>
-                <div class="tempo-bpm">BPM</div>
-              </div>
-              <button class="ctrl-btn" id="tempoUp">+</button>
-            </div>
-            <input type="range" class="tempo-slider" id="tempoSlider" min="40" max="240" value="105">
-          </div>
-        </div>
         <div class="mixer-row">
           <div class="mixer-section" style="margin:0; flex-shrink:0;">
             <div class="mixer-channels">
@@ -702,6 +682,29 @@
                 <div class="out-meters" id="outMeters"></div>
               </div>
               <div class="out-lr">L &nbsp; R</div>
+            </div>
+          </div>
+        </div>
+        <div class="pitch-tempo-row">
+          <div class="pitch-box" style="flex:1;">
+            <div class="ctrl-label">PITCH</div>
+            <div class="pitch-ctrl">
+              <button class="ctrl-btn" id="pitchDown">−</button>
+              <div class="pitch-value" id="pitchDisplay">G</div>
+              <button class="ctrl-btn" id="pitchUp">+</button>
+            </div>
+            <div class="pitch-sub">Nada : <span id="pitchSub">G</span></div>
+          </div>
+          <div class="tempo-box" style="flex:2;">
+            <div class="ctrl-label">TEMPO</div>
+            <div class="tempo-ctrl">
+              <button class="ctrl-btn" id="tempoDown">−</button>
+              <div class="tempo-value">
+                <div class="tempo-num" id="tempoDisplay">105</div>
+                <div class="tempo-bpm">BPM</div>
+              </div>
+              <button class="ctrl-btn" id="tempoUp">+</button>
+              <input type="range" class="tempo-slider" id="tempoSlider" min="40" max="240" value="105" style="flex:1; margin:0;">
             </div>
           </div>
         </div>
