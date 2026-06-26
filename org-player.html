@@ -872,6 +872,71 @@
 </div>
 
 <script>
+// ===== CAPACITOR FILESYSTEM HELPER =====
+const FS = {
+  // Simpan file ke Documents/Org34/List lagu/<album>/
+  async saveFile(album, filename, content) {
+    try {
+      const { Filesystem, Directory } = Capacitor.Plugins;
+      const path = `Org34/List lagu/${album}/${filename}`;
+      await Filesystem.writeFile({
+        path,
+        data: content,
+        directory: Directory.Documents,
+        recursive: true,
+        encoding: 'utf8',
+      });
+      return true;
+    } catch(e) {
+      console.error('FS.saveFile error:', e);
+      return false;
+    }
+  },
+  // Baca semua file .json dari folder album
+  async readFolder(album) {
+    try {
+      const { Filesystem, Directory } = Capacitor.Plugins;
+      const path = `Org34/List lagu/${album}`;
+      const { files } = await Filesystem.readdir({ path, directory: Directory.Documents });
+      const jsonFiles = files.filter(f => (f.name||f).endsWith('.json'));
+      const results = await Promise.all(jsonFiles.map(async f => {
+        const fname = f.name || f;
+        const { data } = await Filesystem.readFile({
+          path: `${path}/${fname}`,
+          directory: Directory.Documents,
+          encoding: 'utf8',
+        });
+        try { return JSON.parse(data); } catch { return null; }
+      }));
+      return results.filter(Boolean);
+    } catch(e) {
+      console.error('FS.readFolder error:', e);
+      return [];
+    }
+  },
+  // List semua subfolder di Org34/List lagu/
+  async listAlbums() {
+    try {
+      const { Filesystem, Directory } = Capacitor.Plugins;
+      const { files } = await Filesystem.readdir({
+        path: 'Org34/List lagu',
+        directory: Directory.Documents,
+      });
+      return files.map(f => f.name || f).filter(Boolean);
+    } catch { return []; }
+  },
+  // Hapus file lagu
+  async deleteFile(album, filename) {
+    try {
+      const { Filesystem, Directory } = Capacitor.Plugins;
+      await Filesystem.deleteFile({
+        path: `Org34/List lagu/${album}/${filename}`,
+        directory: Directory.Documents,
+      });
+      return true;
+    } catch { return false; }
+  }
+};
 // ===== CONSTANTS =====
 const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const TOTAL_SEGS = 18, RED_SEGS = 2, ORANGE_SEGS = 2, YELLOW_SEGS = 3;
@@ -1230,51 +1295,73 @@ document.getElementById('modalSearch').oninput = e => { searchQuery = e.target.v
 document.getElementById('overlayList').onclick = e => { if (e.target===document.getElementById('overlayList')) closeListModal(); };
 
 // ===== FOLDER PICKER =====
+document.querySelector('.btn-open-folder').onclick = async (e) => {
+  if (window.Capacitor?.isNativePlatform()) {
+    e.preventDefault();
+    const albums = await FS.listAlbums();
+    if (!albums.length) {
+      alert('Belum ada folder di Org34/List lagu/\n\nBuat lagu dulu lewat Editor, simpan ke album.');
+      return;
+    }
+    const choice = await showAlbumPicker(albums);
+    if (!choice) return;
+    const data = await FS.readFolder(choice);
+    if (!data.length) { alert(`Folder "${choice}" kosong.`); return; }
+    songs = songs.filter(s => s.album !== choice);
+    const maxId = songs.length ? Math.max(...songs.map(s=>s.id)) : 0;
+    data.forEach((d, i) => { songs.push({ id: maxId+i+1, album: choice, dur:'', birama:'4/4', ...d }); });
+    saveSongs(songs);
+    activeAlbum = choice;
+    renderAlbumCards();
+    renderModalList();
+    return;
+  }
+  document.getElementById('folderPicker').click();
+};
+
+function showAlbumPicker(albums) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:#000a;z-index:9999;display:flex;align-items:center;justify-content:center';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:20px;min-width:260px;max-width:80vw';
+    box.innerHTML = `<div style="font-weight:700;color:#fff;margin-bottom:14px;font-size:14px">📂 Pilih Folder Album</div>`;
+    albums.forEach(a => {
+      const btn = document.createElement('button');
+      btn.textContent = '🎵 ' + a;
+      btn.style.cssText = 'display:block;width:100%;text-align:left;background:#111;border:1px solid #333;color:#fff;padding:10px 14px;border-radius:8px;margin-bottom:8px;font-size:13px;cursor:pointer';
+      btn.onclick = () => { document.body.removeChild(overlay); resolve(a); };
+      box.appendChild(btn);
+    });
+    const cancel = document.createElement('button');
+    cancel.textContent = 'Batal';
+    cancel.style.cssText = 'display:block;width:100%;background:#333;border:none;color:#aaa;padding:8px;border-radius:8px;margin-top:4px;cursor:pointer';
+    cancel.onclick = () => { document.body.removeChild(overlay); resolve(null); };
+    box.appendChild(cancel);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
+
 document.getElementById('folderPicker').onchange = async (e) => {
   const files = [...e.target.files].filter(f => f.name.endsWith('.json'));
-  if (!files.length) { alert('Tidak ada file .json di folder ini.'); return; }
-
-  // nama folder dari path file pertama
-  const folderName = files[0].webkitRelativePath.split('/')[0];
-
-  // hapus lagu lama dari folder ini (kalau reload folder yang sama)
+  if (!files.length) { alert('Tidak ada file .json yang dipilih.'); return; }
+  const folderName = prompt(`${files.length} file dipilih.\nMasukkan nama album/kategori:`, 'Dangdut') || 'Umum';
   songs = songs.filter(s => s.album !== folderName);
-
-  // baca semua file json
-  const results = await Promise.all(files.map(f => f.text().then(txt => {
+  const maxId = songs.length ? Math.max(...songs.map(s => s.id)) : 0;
+  const results = await Promise.all(files.map((f, i) => f.text().then(txt => {
     try {
       const data = JSON.parse(txt);
-      return {
-        id: nextId(songs) + Math.random(), // id sementara unik
-        title:  data.title  || f.name.replace('.json',''),
-        artist: data.artist || '',
-        key:    data.key    || 'C',
-        album:  folderName,
-        dur:    data.dur    || '',
-        tempo:  data.tempo  || 105,
-        birama: data.birama || '4/4',
-        chords: data.chords || [],
-        lirik:  data.lirik  || '',
-      };
+      return { id: maxId+i+1, title: data.title||f.name.replace('.json',''), artist: data.artist||'', key: data.key||'C', album: folderName, dur: data.dur||'', tempo: data.tempo||105, birama: data.birama||'4/4', chords: data.chords||[], lirik: data.lirik||'' };
     } catch { return null; }
   })));
-
   const valid = results.filter(Boolean);
   if (!valid.length) { alert('File .json tidak valid.'); return; }
-
-  // beri id integer berurutan
-  const maxId = songs.length ? Math.max(...songs.map(s=>s.id)) : 0;
-  valid.forEach((s, i) => s.id = maxId + i + 1);
-
   songs.push(...valid);
   saveSongs(songs);
-
-  // refresh modal dengan album folder baru aktif
   activeAlbum = folderName;
   renderAlbumCards();
   renderModalList();
-
-  // reset input agar bisa pilih folder yang sama lagi
   e.target.value = '';
 };
 
@@ -1378,21 +1465,37 @@ function collectEditorData() {
   };
 }
 
-document.getElementById('saveEditor').onclick = () => {
+document.getElementById('saveEditor').onclick = async () => {
   const data = collectEditorData();
   const existing = songs.find(s => s.id === editingSongId);
+  let song;
   if (existing) {
     Object.assign(existing, data);
     saveSongs(songs);
     if (activeSongId === editingSongId) loadSongToPlayer(existing);
+    song = existing;
   } else {
     if (!data.title) { alert('Judul lagu wajib diisi!'); return; }
-    const newSong = { id: nextId(songs), ...data };
-    songs.push(newSong);
+    song = { id: nextId(songs), ...data };
+    songs.push(song);
     saveSongs(songs);
-    loadSongToPlayer(newSong);
+    loadSongToPlayer(song);
   }
   renderSidebar();
+
+  // Simpan ke file lokal jika Capacitor tersedia
+  if (window.Capacitor?.isNativePlatform()) {
+    const album = song.album || 'Umum';
+    const filename = song.title.replace(/[^a-zA-Z0-9\s]/g,'').trim().replace(/\s+/g,'_') + '.json';
+    const content = JSON.stringify(song, null, 2);
+    const ok = await FS.saveFile(album, filename, content);
+    if (ok) {
+      alert(`✅ Tersimpan di:\nOrg34/List lagu/${album}/${filename}`);
+    } else {
+      alert('⚠️ Gagal simpan ke file lokal. Data tetap tersimpan di app.');
+    }
+  }
+
   document.getElementById('overlayEditor').classList.remove('open');
 };
 
