@@ -405,6 +405,13 @@
     padding: 14px 18px; border-bottom: 1px solid #222; flex-shrink: 0;
   }
   .modal-header h3 { font-size: 15px; font-weight: 700; color: #fff; }
+  .btn-open-folder {
+    display: flex; align-items: center; gap: 6px;
+    background: #1a3a6b; border: 1px solid #1e90ff; color: #4da6ff;
+    padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; margin-left: auto; margin-right: 8px; white-space: nowrap;
+  }
+  .btn-open-folder:hover { background: #1e4a8a; }
   .modal-close {
     background: #2a2a2a; border: none; color: #aaa; border-radius: 6px;
     width: 30px; height: 30px; font-size: 16px; cursor: pointer;
@@ -829,6 +836,10 @@
   <div class="modal-list">
     <div class="modal-header">
       <h3>📁 Galeri Lagu</h3>
+      <label class="btn-open-folder" title="Buka Folder Lagu">
+        📂 Buka Folder
+        <input type="file" id="folderPicker" webkitdirectory multiple accept=".json" style="display:none">
+      </label>
       <button class="modal-close" id="closeList">✕</button>
     </div>
     <div class="modal-search">
@@ -1217,6 +1228,55 @@ document.getElementById('btnListLagu').onclick = openListModal;
 document.getElementById('closeList').onclick = closeListModal;
 document.getElementById('modalSearch').oninput = e => { searchQuery = e.target.value.toLowerCase().trim(); renderModalList(); };
 document.getElementById('overlayList').onclick = e => { if (e.target===document.getElementById('overlayList')) closeListModal(); };
+
+// ===== FOLDER PICKER =====
+document.getElementById('folderPicker').onchange = async (e) => {
+  const files = [...e.target.files].filter(f => f.name.endsWith('.json'));
+  if (!files.length) { alert('Tidak ada file .json di folder ini.'); return; }
+
+  // nama folder dari path file pertama
+  const folderName = files[0].webkitRelativePath.split('/')[0];
+
+  // hapus lagu lama dari folder ini (kalau reload folder yang sama)
+  songs = songs.filter(s => s.album !== folderName);
+
+  // baca semua file json
+  const results = await Promise.all(files.map(f => f.text().then(txt => {
+    try {
+      const data = JSON.parse(txt);
+      return {
+        id: nextId(songs) + Math.random(), // id sementara unik
+        title:  data.title  || f.name.replace('.json',''),
+        artist: data.artist || '',
+        key:    data.key    || 'C',
+        album:  folderName,
+        dur:    data.dur    || '',
+        tempo:  data.tempo  || 105,
+        birama: data.birama || '4/4',
+        chords: data.chords || [],
+        lirik:  data.lirik  || '',
+      };
+    } catch { return null; }
+  })));
+
+  const valid = results.filter(Boolean);
+  if (!valid.length) { alert('File .json tidak valid.'); return; }
+
+  // beri id integer berurutan
+  const maxId = songs.length ? Math.max(...songs.map(s=>s.id)) : 0;
+  valid.forEach((s, i) => s.id = maxId + i + 1);
+
+  songs.push(...valid);
+  saveSongs(songs);
+
+  // refresh modal dengan album folder baru aktif
+  activeAlbum = folderName;
+  renderAlbumCards();
+  renderModalList();
+
+  // reset input agar bisa pilih folder yang sama lagi
+  e.target.value = '';
+};
 
 // ===== EDITOR =====
 let activeEditorTab = 'info';
