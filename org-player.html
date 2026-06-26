@@ -1144,29 +1144,50 @@ setInterval(() => {
 }, 1000);
 
 // ===== SONGS DATA — localStorage =====
-const DEFAULT_SONGS = [
-  { id:1, title:'Suci Dalam Debu', artist:'Iklim', key:'A', album:'Pop Melayu', dur:'3:45', tempo:105, birama:'4/4', chords:['G','F','D#','D'], lirik:'Andai waktu dapat kuputar kembali\nIngin kuucapkan kata maafku untukmu\nTerlambat sudah kini ku sadari\nCinta suci yang ku pinta\n\nAndai masa dapat ku ulang semula\nKu pastikan tiada air matamu\nMaafkan ku yang mengkhianatimu\nKasih yang suci yang kau beri' },
-  { id:2, title:'Separuh Aku', artist:'Noah', key:'C', album:'Pop Indo', dur:'4:12', tempo:90, birama:'4/4', chords:['C','G','Am','F'], lirik:'' },
-  { id:3, title:'Seberapa Pantas', artist:'Sheila On 7', key:'G', album:'Pop Indo', dur:'4:30', tempo:80, birama:'4/4', chords:['G','D','Em','C'], lirik:'' },
-  { id:4, title:'Bintang Di Surga', artist:'Peterpan', key:'D', album:'Pop Indo', dur:'4:05', tempo:95, birama:'4/4', chords:['D','A','Bm','G'], lirik:'' },
-  { id:5, title:'Kau Adalah', artist:'Isyana Sarasvati', key:'Bb', album:'Pop Indo', dur:'3:58', tempo:88, birama:'4/4', chords:['Bb','F','Gm','Eb'], lirik:'' },
-];
-
 function loadSongs() {
   try {
     const raw = localStorage.getItem('orgSongs');
     if (raw) return JSON.parse(raw);
   } catch(e) {}
-  localStorage.setItem('orgSongs', JSON.stringify(DEFAULT_SONGS));
-  return DEFAULT_SONGS;
+  return [];
 }
 function saveSongs(arr) { localStorage.setItem('orgSongs', JSON.stringify(arr)); }
+function saveImportedAlbums(albums) { localStorage.setItem('orgImportedAlbums', JSON.stringify(albums)); }
+function loadImportedAlbums() {
+  try { return JSON.parse(localStorage.getItem('orgImportedAlbums') || '[]'); } catch { return []; }
+}
 function nextId(arr) { return arr.length ? Math.max(...arr.map(s => s.id)) + 1 : 1; }
 
 let songs = loadSongs();
 let activeSongId = songs[0]?.id || null;
 let searchQuery = '';
 let activeAlbum = 'Semua';
+
+// ===== AUTO SYNC dari folder saat app dibuka =====
+async function autoSyncFolders() {
+  if (!window.Capacitor?.isNativePlatform()) return;
+  const importedAlbums = loadImportedAlbums();
+  if (!importedAlbums.length) return;
+
+  let newSongs = [];
+  for (const album of importedAlbums) {
+    const data = await FS.readFolder(album);
+    data.forEach((d, i) => {
+      newSongs.push({ id: newSongs.length + i + 1, album, dur:'', birama:'4/4', ...d });
+    });
+  }
+
+  if (newSongs.length) {
+    // re-assign id berurutan
+    newSongs.forEach((s, i) => s.id = i + 1);
+    songs = newSongs;
+    saveSongs(songs);
+    renderSidebar();
+    if (!songs.find(s => s.id === activeSongId) && songs.length) {
+      loadSongToPlayer(songs[0]);
+    }
+  }
+}
 
 // ===== LOAD SONG KE PLAYER =====
 function loadSongToPlayer(song) {
@@ -1311,6 +1332,9 @@ document.querySelector('.btn-open-folder').onclick = async (e) => {
     const maxId = songs.length ? Math.max(...songs.map(s=>s.id)) : 0;
     data.forEach((d, i) => { songs.push({ id: maxId+i+1, album: choice, dur:'', birama:'4/4', ...d }); });
     saveSongs(songs);
+    // simpan album ini ke daftar imported untuk auto sync
+    const imported = loadImportedAlbums();
+    if (!imported.includes(choice)) { imported.push(choice); saveImportedAlbums(imported); }
     activeAlbum = choice;
     renderAlbumCards();
     renderModalList();
@@ -1514,8 +1538,68 @@ btnNew.textContent = '➕ Lagu Baru';
 btnNew.onclick = () => openEditor(null);
 edFooter.prepend(btnNew);
 
-// Load lagu pertama saat start
-if (songs.length) loadSongToPlayer(songs[0]);
+// Tombol Pilih Lagu di header editor
+const edModalHeader = document.querySelector('#overlayEditor .modal-header');
+const btnPilihLagu = document.createElement('button');
+btnPilihLagu.className = 'btn-cancel';
+btnPilihLagu.style.cssText = 'margin-left:8px;font-size:12px;padding:6px 12px';
+btnPilihLagu.textContent = '🎵 Pilih Lagu';
+btnPilihLagu.onclick = () => {
+  // tampilkan picker lagu dari list
+  showSongPicker();
+};
+edModalHeader.appendChild(btnPilihLagu);
+
+function showSongPicker() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:#000c;z-index:9999;display:flex;align-items:center;justify-content:center';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:16px;width:85vw;max-height:70vh;display:flex;flex-direction:column';
+  box.innerHTML = `<div style="font-weight:700;color:#fff;margin-bottom:12px;font-size:14px">🎵 Pilih Lagu untuk Diedit</div>
+    <input id="songPickerSearch" placeholder="Cari lagu..." style="background:#111;border:1px solid #333;border-radius:8px;padding:8px 12px;color:#fff;font-size:13px;margin-bottom:10px;width:100%">
+    <div id="songPickerList" style="overflow-y:auto;flex:1"></div>
+    <button style="margin-top:10px;background:#333;border:none;color:#aaa;padding:8px;border-radius:8px;cursor:pointer" onclick="this.closest('div[style]').parentElement.remove()">Batal</button>`;
+
+  function renderPicker(query='') {
+    const list = box.querySelector('#songPickerList');
+    const filtered = songs.filter(s => !query || s.title.toLowerCase().includes(query) || s.artist.toLowerCase().includes(query));
+    list.innerHTML = filtered.map(s => `
+      <div data-id="${s.id}" style="padding:10px 12px;border-bottom:1px solid #222;cursor:pointer;border-radius:8px">
+        <div style="color:#fff;font-size:13px;font-weight:600">${s.title}</div>
+        <div style="color:#888;font-size:11px">${s.artist} • ${s.album}</div>
+      </div>`).join('');
+    list.querySelectorAll('[data-id]').forEach(row => {
+      row.onmouseenter = () => row.style.background = '#252525';
+      row.onmouseleave = () => row.style.background = '';
+      row.onclick = () => {
+        document.body.removeChild(overlay);
+        openEditor(parseInt(row.dataset.id));
+      };
+    });
+  }
+
+  box.querySelector('#songPickerSearch').oninput = e => renderPicker(e.target.value.toLowerCase());
+  renderPicker();
+  overlay.appendChild(box);
+  overlay.onclick = e => { if (e.target===overlay) document.body.removeChild(overlay); };
+  document.body.appendChild(overlay);
+}
+
+// ===== INIT =====
+// Clear localStorage lama (dummy data) — reset sekali
+const dataVersion = localStorage.getItem('orgDataVersion');
+if (dataVersion !== '2') {
+  localStorage.removeItem('orgSongs');
+  localStorage.setItem('orgDataVersion', '2');
+  songs = [];
+}
+
+// Auto sync folder saat app dibuka
+autoSyncFolders().then(() => {
+  if (songs.length) loadSongToPlayer(songs[0]);
+  renderSidebar();
+});
+
 </script>
 </body>
 </html>
