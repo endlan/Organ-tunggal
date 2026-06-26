@@ -761,7 +761,7 @@
       <!-- KOLOM KIRI: mixer atas, pitch+tempo bawah -->
       <div class="col-controls">
         <div class="mixer-row">
-          <div class="mixer-section" style="margin:0; flex-shrink:0;">
+          <div class="mixer-section" style="margin:0; flex-shrink:1; min-width:0; overflow:hidden;">
             <div class="mixer-channels">
               <div class="mixer-title">MIXER / VOLUME KANAL</div>
               <div class="channels" id="channels"></div>
@@ -871,8 +871,211 @@
   </div>
 </div>
 
-<!-- Tone.js audio engine -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+<script>
+// ===== WEB AUDIO CHORD ENGINE =====
+const NOTE_FREQ = {
+  'C3':130.81,'C#3':138.59,'D3':146.83,'D#3':155.56,'E3':164.81,'F3':174.61,'F#3':185.00,'G3':196.00,'G#3':207.65,'A3':220.00,'A#3':233.08,'B3':246.94,
+  'C4':261.63,'C#4':277.18,'D4':293.66,'D#4':311.13,'E4':329.63,'F4':349.23,'F#4':369.99,'G4':392.00,'G#4':415.30,'A4':440.00,'A#4':466.16,'B4':493.88,
+};
+const CHORD_NOTE_MAP = {
+  'C':['C3','E3','G3','C4'],'C#':['C#3','F3','G#3','C#4'],'Db':['C#3','F3','G#3','C#4'],
+  'D':['D3','F#3','A3','D4'],'D#':['D#3','G3','A#3','D#4'],'Eb':['D#3','G3','A#3','D#4'],
+  'E':['E3','G#3','B3','E4'],'F':['F3','A3','C4','F4'],'F#':['F#3','A#3','C#4','F#4'],
+  'G':['G3','B3','D4','G4'],'G#':['G#3','C4','D#4','G#4'],'Ab':['G#3','C4','D#4','G#4'],
+  'A':['A3','C#4','E4','A4'],'A#':['A#3','D4','F4','A#4'],'Bb':['A#3','D4','F4','A#4'],
+  'B':['B3','D#4','F#4','B4'],
+  'Am':['A3','C4','E4','A4'],'Em':['E3','G3','B3','E4'],'Dm':['D3','F3','A3','D4'],
+  'Bm':['B3','D4','F#4','B4'],'Gm':['G3','A#3','D4','G4'],'Cm':['C3','D#3','G3','C4'],
+};
+let _ctx=null, _nodes=[];
+function _getCtx(){if(!_ctx)_ctx=new(window.AudioContext||window.webkitAudioContext)();return _ctx;}
+function playChord(name){
+  stopChord();
+  const ctx=_getCtx(); if(ctx.state==='suspended')ctx.resume();
+  const notes=CHORD_NOTE_MAP[name]; if(!notes)return;
+  const master=ctx.createGain(); master.gain.value=0.35; master.connect(ctx.destination);
+  notes.forEach(n=>{
+    const f=NOTE_FREQ[n]; if(!f)return;
+    const osc=ctx.createOscillator(),g=ctx.createGain();
+    osc.type='triangle'; osc.frequency.value=f;
+    g.gain.setValueAtTime(0,ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.25,ctx.currentTime+0.02);
+    osc.connect(g); g.connect(master); osc.start();
+    _nodes.push({osc,g});
+  });
+}
+function stopChord(){
+  const ctx=_getCtx();
+  _nodes.forEach(({osc,g})=>{
+    g.gain.setValueAtTime(g.gain.value,ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0,ctx.currentTime+0.15);
+    osc.stop(ctx.currentTime+0.15);
+  });
+  _nodes=[];
+}
+
+// ===== DANGDUT RHYTHM ENGINE =====
+let _rhythmCtx = null;
+let _rhythmTimeout = null;
+let _currentChordRoot = 'C';
+let _rhythmMode = null; // 'intro','main','fill1','fill2','ending'
+let _rhythmStep = 0;
+let _rhythmBPM = 105;
+
+function _getRhythmCtx() {
+  if (!_rhythmCtx) _rhythmCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return _rhythmCtx;
+}
+
+// Frekuensi bass per nada
+const BASS_FREQ = {
+  'C':65.41,'C#':69.30,'D':73.42,'D#':77.78,'E':82.41,'F':87.31,
+  'F#':92.50,'G':98.00,'G#':103.83,'A':110.00,'A#':116.54,'B':123.47
+};
+
+function _playDrum(ctx, type, time, vol=1) {
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol, time);
+  g.connect(ctx.destination);
+
+  if (type === 'kick') {
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.exponentialRampToValueAtTime(40, time + 0.15);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+    osc.connect(g); osc.start(time); osc.stop(time + 0.2);
+  } else if (type === 'snare') {
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.15, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random()*2-1) * Math.pow(1-i/data.length, 2);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+    src.connect(g); src.start(time);
+  } else if (type === 'hihat') {
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random()*2-1) * Math.pow(1-i/data.length, 3);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filt = ctx.createBiquadFilter();
+    filt.type = 'highpass'; filt.frequency.value = 8000;
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+    src.connect(filt); filt.connect(g); src.start(time);
+  } else if (type === 'kendang') {
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(200, time);
+    osc.frequency.exponentialRampToValueAtTime(80, time + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+    osc.connect(g); osc.start(time); osc.stop(time + 0.1);
+  }
+}
+
+function _playBass(ctx, note, time, dur=0.18, vol=0.5) {
+  const freq = BASS_FREQ[note] || 110;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(vol, time);
+  g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(time); osc.stop(time + dur);
+}
+
+// Pattern dangdut: 16 step per bar, 1 bar = 4 ketuk
+// step = 1/16 note
+const PATTERNS = {
+  main: {
+    kick:   [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    snare:  [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hihat:  [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    kendang:[0,0,1,0, 0,1,0,0, 0,0,1,0, 0,1,0,1],
+    bass:   [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+  },
+  intro: {
+    kick:   [1,0,1,0, 1,0,1,0, 1,0,0,0, 0,0,0,0],
+    snare:  [0,0,0,0, 0,0,0,0, 0,0,1,0, 1,0,1,0],
+    hihat:  [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    kendang:[0,1,0,1, 0,1,0,1, 0,0,0,0, 0,0,0,0],
+    bass:   [1,0,0,0, 1,0,0,0, 1,0,1,0, 1,0,1,0],
+  },
+  fill1: {
+    kick:   [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+    snare:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 1,1,1,0],
+    hihat:  [1,1,1,1, 1,1,1,1, 1,1,1,1, 0,0,0,0],
+    kendang:[0,0,0,1, 0,0,0,1, 0,0,0,1, 1,1,1,1],
+    bass:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,0,0],
+  },
+  fill2: {
+    kick:   [1,0,1,0, 0,1,0,1, 1,0,1,0, 0,1,0,1],
+    snare:  [0,1,0,1, 1,0,1,0, 0,1,0,1, 1,0,1,0],
+    hihat:  [1,0,0,1, 0,1,0,0, 1,0,0,1, 0,1,0,0],
+    kendang:[1,1,0,0, 1,1,0,0, 1,1,0,0, 1,1,1,1],
+    bass:   [1,0,0,0, 0,1,0,0, 1,0,0,0, 0,0,1,0],
+  },
+  ending: {
+    kick:   [1,0,0,0, 0,0,0,0, 1,0,0,0, 1,1,1,1],
+    snare:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 1,1,1,1],
+    hihat:  [1,0,1,0, 1,0,1,0, 1,0,1,0, 0,0,0,0],
+    kendang:[0,1,0,1, 0,1,0,0, 0,0,1,0, 1,1,1,0],
+    bass:   [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+  },
+};
+
+function _scheduleBar(ctx, pattern, startTime, root, bpm, onDone) {
+  const stepDur = (60 / bpm) / 4; // 1/16 note duration
+  const p = PATTERNS[pattern] || PATTERNS.main;
+
+  for (let s = 0; s < 16; s++) {
+    const t = startTime + s * stepDur;
+    if (p.kick[s])    _playDrum(ctx, 'kick', t, 0.8);
+    if (p.snare[s])   _playDrum(ctx, 'snare', t, 0.5);
+    if (p.hihat[s])   _playDrum(ctx, 'hihat', t, 0.3);
+    if (p.kendang[s]) _playDrum(ctx, 'kendang', t, 0.6);
+    if (p.bass[s])    _playBass(ctx, root, t, stepDur * 0.8, 0.4);
+  }
+
+  const barDur = 16 * stepDur;
+  if (onDone) {
+    _rhythmTimeout = setTimeout(onDone, (barDur - 0.05) * 1000);
+  }
+}
+
+function startRhythm(mode, chord) {
+  stopRhythm();
+  _rhythmMode = mode;
+  _currentChordRoot = chord || _currentChordRoot;
+  const ctx = _getRhythmCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+
+  function loop() {
+    const nextPattern = (_rhythmMode === 'intro' || _rhythmMode === 'fill1' || _rhythmMode === 'fill2' || _rhythmMode === 'ending')
+      ? _rhythmMode : 'main';
+    _scheduleBar(ctx, nextPattern, ctx.currentTime + 0.05, _currentChordRoot, _rhythmBPM, () => {
+      // setelah intro/fill/ending, balik ke main
+      if (_rhythmMode === 'intro' || _rhythmMode === 'fill1' || _rhythmMode === 'fill2') {
+        _rhythmMode = 'main';
+      } else if (_rhythmMode === 'ending') {
+        _rhythmMode = null; return; // stop
+      }
+      if (_rhythmMode) loop();
+    });
+  }
+  loop();
+}
+
+function stopRhythm() {
+  if (_rhythmTimeout) { clearTimeout(_rhythmTimeout); _rhythmTimeout = null; }
+  _rhythmMode = null;
+}
+
+function setRhythmChord(chord) {
+  _currentChordRoot = chord;
+}
+
+</script>
+
 <script>
 // ===== CAPACITOR FILESYSTEM HELPER =====
 const FS = {
@@ -1101,8 +1304,31 @@ function updateChords() {
     const btn = document.createElement('button');
     btn.className = `chord-btn ${ch.color}`;
     btn.innerHTML = `<div class="chord-key">${ch.note}</div><div class="chord-deg">${ch.deg}</div>`;
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      playChord(ch.note);
+      setRhythmChord(ch.note);
+      btn.style.filter='brightness(1.4)';
+    });
+    btn.addEventListener('pointerup',   () => { stopChord(); btn.style.filter=''; });
+    btn.addEventListener('pointerleave',() => { stopChord(); btn.style.filter=''; });
     chordsRow.appendChild(btn);
   });
+}
+
+// ===== PLAY BUTTONS =====
+document.querySelector('.btn-intro').addEventListener('pointerdown', e => {
+  e.preventDefault(); startRhythm('intro', _currentChordRoot);
+});
+document.querySelector('.btn-fill1').addEventListener('pointerdown', e => {
+  e.preventDefault(); startRhythm('fill1', _currentChordRoot);
+});
+document.querySelector('.btn-fill2').addEventListener('pointerdown', e => {
+  e.preventDefault(); startRhythm('fill2', _currentChordRoot);
+});
+document.querySelector('.btn-ending').addEventListener('pointerdown', e => {
+  e.preventDefault(); startRhythm('ending', _currentChordRoot);
+});
   // update Next Chord di header (ambil 3 chord setelah aktif)
   document.getElementById('ncf').textContent  = currentChords[1].note;
   document.getElementById('ncds').textContent = currentChords[2].note;
@@ -1125,6 +1351,7 @@ updateChords(); // render awal
 // ===== TEMPO =====
 function updateTempo(val) {
   bpm = Math.max(40, Math.min(240, val));
+  _rhythmBPM = bpm;
   document.getElementById('tempoDisplay').textContent = bpm;
   document.querySelectorAll('.song-meta span').forEach(s => {
     if (s.textContent.includes('BPM')) s.textContent = bpm + ' BPM';
@@ -1191,75 +1418,7 @@ async function autoSyncFolders() {
   }
 }
 
-// ===== CHORD AUDIO ENGINE =====
-const CHORD_COLORS = ['#1a4a1a','#1a2a6a','#5a4400','#4a1a6a','#5a1a1a','#1a4a4a','#3a2a00','#2a1a5a'];
-
-// Map chord name ke frekuensi notes
-const CHORD_NOTES = {
-  'C':  ['C3','E3','G3','C4'],  'C#': ['C#3','F3','G#3','C#4'], 'Db': ['C#3','F3','G#3','C#4'],
-  'D':  ['D3','F#3','A3','D4'], 'D#': ['D#3','G3','A#3','D#4'], 'Eb': ['D#3','G3','A#3','D#4'],
-  'E':  ['E3','G#3','B3','E4'], 'F':  ['F3','A3','C4','F4'],    'F#': ['F#3','A#3','C#4','F#4'],
-  'Gb': ['F#3','A#3','C#4','F#4'], 'G': ['G3','B3','D4','G4'],  'G#': ['G#3','C4','D#4','G#4'],
-  'Ab': ['G#3','C4','D#4','G#4'], 'A': ['A3','C#4','E4','A4'],  'A#': ['A#3','D4','F4','A#4'],
-  'Bb': ['A#3','D4','F4','A#4'], 'B': ['B3','D#4','F#4','B4'],
-  // Minor chords
-  'Am': ['A3','C4','E4','A4'],  'Em': ['E3','G3','B3','E4'],   'Dm': ['D3','F3','A3','D4'],
-  'Bm': ['B3','D4','F#4','B4'], 'Gm': ['G3','A#3','D4','G4'], 'Cm': ['C3','D#3','G3','C4'],
-  'Fm': ['F3','G#3','C4','F4'], 'Bbm':['A#3','C#4','F4','A#4'],
-};
-
-let synth = null;
-let activeChordNotes = [];
-
-function getSynth() {
-  if (!synth) {
-    synth = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: 'triangle' },
-      envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5 },
-      volume: -6,
-    }).toDestination();
-  }
-  return synth;
-}
-
-function playChord(chordName) {
-  stopChord();
-  const notes = CHORD_NOTES[chordName];
-  if (!notes) return;
-  Tone.start();
-  activeChordNotes = notes;
-  getSynth().triggerAttack(notes);
-}
-
-function stopChord() {
-  if (activeChordNotes.length) {
-    getSynth().triggerRelease(activeChordNotes);
-    activeChordNotes = [];
-  }
-}
-
-// ===== RENDER CHORD BUTTONS =====
-function renderChords(chords) {
-  const row = document.getElementById('chordsRow');
-  row.innerHTML = '';
-  if (!chords || !chords.length) return;
-  chords.forEach((chord, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'chord-btn';
-    btn.style.background = CHORD_COLORS[i % CHORD_COLORS.length];
-    // degree label
-    const degrees = ['I','II','III','IV','V','VI','VII','VIII'];
-    btn.innerHTML = `<div class="chord-key">${chord}</div><div class="chord-deg">${degrees[i]||''}</div>`;
-
-    // Touch events untuk sustain selama ditekan
-    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); playChord(chord); btn.style.filter='brightness(1.4)'; });
-    btn.addEventListener('pointerup',   ()  => { stopChord(); btn.style.filter=''; });
-    btn.addEventListener('pointerleave',()  => { stopChord(); btn.style.filter=''; });
-
-    row.appendChild(btn);
-  });
-}
-
+// ===== LOAD SONG KE PLAYER =====
 function loadSongToPlayer(song) {
   activeSongId = song.id;
   document.querySelector('.song-info h2').textContent = song.title;
@@ -1272,14 +1431,13 @@ function loadSongToPlayer(song) {
   // tempo
   bpm = song.tempo || 105;
   document.getElementById('tempoDisplay').textContent = bpm;
+  _rhythmBPM = bpm;
   // lirik
   const lines = (song.lirik || '').split('\n');
   document.querySelector('.lyric-active-prev').textContent = lines[0] || '';
   document.querySelector('.lyric-active').textContent     = lines[1] || '';
   document.querySelector('.lyric-next1').textContent      = lines[2] || '';
   document.querySelector('.lyric-next2').textContent      = lines[3] || '';
-  // chord buttons
-  renderChords(song.chords || []);
   renderSidebar();
 }
 
