@@ -871,6 +871,8 @@
   </div>
 </div>
 
+<!-- Tone.js audio engine -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
 <script>
 // ===== CAPACITOR FILESYSTEM HELPER =====
 const FS = {
@@ -1189,7 +1191,75 @@ async function autoSyncFolders() {
   }
 }
 
-// ===== LOAD SONG KE PLAYER =====
+// ===== CHORD AUDIO ENGINE =====
+const CHORD_COLORS = ['#1a4a1a','#1a2a6a','#5a4400','#4a1a6a','#5a1a1a','#1a4a4a','#3a2a00','#2a1a5a'];
+
+// Map chord name ke frekuensi notes
+const CHORD_NOTES = {
+  'C':  ['C3','E3','G3','C4'],  'C#': ['C#3','F3','G#3','C#4'], 'Db': ['C#3','F3','G#3','C#4'],
+  'D':  ['D3','F#3','A3','D4'], 'D#': ['D#3','G3','A#3','D#4'], 'Eb': ['D#3','G3','A#3','D#4'],
+  'E':  ['E3','G#3','B3','E4'], 'F':  ['F3','A3','C4','F4'],    'F#': ['F#3','A#3','C#4','F#4'],
+  'Gb': ['F#3','A#3','C#4','F#4'], 'G': ['G3','B3','D4','G4'],  'G#': ['G#3','C4','D#4','G#4'],
+  'Ab': ['G#3','C4','D#4','G#4'], 'A': ['A3','C#4','E4','A4'],  'A#': ['A#3','D4','F4','A#4'],
+  'Bb': ['A#3','D4','F4','A#4'], 'B': ['B3','D#4','F#4','B4'],
+  // Minor chords
+  'Am': ['A3','C4','E4','A4'],  'Em': ['E3','G3','B3','E4'],   'Dm': ['D3','F3','A3','D4'],
+  'Bm': ['B3','D4','F#4','B4'], 'Gm': ['G3','A#3','D4','G4'], 'Cm': ['C3','D#3','G3','C4'],
+  'Fm': ['F3','G#3','C4','F4'], 'Bbm':['A#3','C#4','F4','A#4'],
+};
+
+let synth = null;
+let activeChordNotes = [];
+
+function getSynth() {
+  if (!synth) {
+    synth = new Tone.PolySynth(Tone.Synth, {
+      oscillator: { type: 'triangle' },
+      envelope: { attack: 0.02, decay: 0.1, sustain: 0.8, release: 0.5 },
+      volume: -6,
+    }).toDestination();
+  }
+  return synth;
+}
+
+function playChord(chordName) {
+  stopChord();
+  const notes = CHORD_NOTES[chordName];
+  if (!notes) return;
+  Tone.start();
+  activeChordNotes = notes;
+  getSynth().triggerAttack(notes);
+}
+
+function stopChord() {
+  if (activeChordNotes.length) {
+    getSynth().triggerRelease(activeChordNotes);
+    activeChordNotes = [];
+  }
+}
+
+// ===== RENDER CHORD BUTTONS =====
+function renderChords(chords) {
+  const row = document.getElementById('chordsRow');
+  row.innerHTML = '';
+  if (!chords || !chords.length) return;
+  chords.forEach((chord, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'chord-btn';
+    btn.style.background = CHORD_COLORS[i % CHORD_COLORS.length];
+    // degree label
+    const degrees = ['I','II','III','IV','V','VI','VII','VIII'];
+    btn.innerHTML = `<div class="chord-key">${chord}</div><div class="chord-deg">${degrees[i]||''}</div>`;
+
+    // Touch events untuk sustain selama ditekan
+    btn.addEventListener('pointerdown', (e) => { e.preventDefault(); playChord(chord); btn.style.filter='brightness(1.4)'; });
+    btn.addEventListener('pointerup',   ()  => { stopChord(); btn.style.filter=''; });
+    btn.addEventListener('pointerleave',()  => { stopChord(); btn.style.filter=''; });
+
+    row.appendChild(btn);
+  });
+}
+
 function loadSongToPlayer(song) {
   activeSongId = song.id;
   document.querySelector('.song-info h2').textContent = song.title;
@@ -1208,6 +1278,8 @@ function loadSongToPlayer(song) {
   document.querySelector('.lyric-active').textContent     = lines[1] || '';
   document.querySelector('.lyric-next1').textContent      = lines[2] || '';
   document.querySelector('.lyric-next2').textContent      = lines[3] || '';
+  // chord buttons
+  renderChords(song.chords || []);
   renderSidebar();
 }
 
